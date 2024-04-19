@@ -1,0 +1,245 @@
+﻿@page "/loan_management"
+@inject ILoanService LoanService
+@inject IBookService BookService
+@inject IMemberService MemberService
+
+<PageTitle>Loan Management</PageTitle>
+
+<!-- Section for managing current loans -->
+<h4>Current Loans</h4>
+<!-- Search and filter functionality for loans -->
+<div>
+    <input type="text" @bind="searchTerm" placeholder="Enter name, email or book" />
+    <button @onclick="SearchLoans">Search</button>
+    <span> @searchResults.Count results </span> <!-- Display the count of search results -->
+</div>
+
+<!-- Table display for loans -->
+@if (searchResults != null && searchResults.Count > 0)
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Book Title</th>
+                <th>Member Name</th>
+                <th>Checkout Date</th>
+                <th>Due Date</th>
+                <th>Return Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var loan in searchResults.Skip((currentPage - 1) * pageSize).Take(pageSize))
+            {
+                <tr>
+                    <td>@loan.BookTitle</td>
+                    <td>@loan.MemberName</td>
+                    <td>@loan.CheckoutDate.ToShortDateString()</td>
+                    <td>@loan.DueDate.ToShortDateString()</td>
+                    <td>@loan.ReturnDate?.ToShortDateString()</td>
+                    <td>
+                        <!-- Conditional display of the Return button -->
+                        @if (loan.ReturnDate == null)
+                        {
+                            <button class="btn btn-primary" @onclick="() => ReturnLoan(loan)">Return</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <!-- Pagination controls -->
+    @if (searchResults.Count > pageSize)
+    {
+        <div>
+            <button class="btn btn-link" disabled="@IsFirstPage()" @onclick="PrevPage">Previous</button>
+            <button class="btn btn-link" disabled="@IsLastPage()" @onclick="NextPage">Next</button>
+        </div>
+    }
+}
+else
+{
+    <p>No loans found.</p> <!-- Displayed if no loans are found -->
+}
+
+<!-- Form for adding new loans -->
+<h4>Add New Loan</h4>
+<p style="color: red; font-size: small;">* All loans are to be returned within 30 days</p>
+<EditForm Model="@newLoan" OnValidSubmit="AddLoan">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    
+    <!-- Dropdown for Book List -->
+    <div class="form-group">
+        <label for="bookTitle">Book Title:</label>
+        <select class="form-control" @bind="@newLoan.BookISBN">
+            <option value="">Select Book</option>
+            @foreach (var book in searchBooks.OrderBy(b => b.Title))
+            {
+                <option value="@book.ISBN">@book.Title (@book.ISBN)</option>
+            }
+        </select>
+    </div>
+
+    <!-- Dropdown for Member List -->
+    <div class="form-group">
+        <label for="memberName">Member Name:</label>
+        <select class="form-control" @bind="@newLoan.MemberEmail">
+            <option value="">Select Member</option>
+            @foreach (var member in searchMembers.OrderBy(m => m.Name))
+            {
+                <option value="@member.Email">@member.Name (@member.Email)</option>
+            }
+        </select>
+    </div>
+
+
+    <div class="form-group mt-3">
+        <button type="submit" class="btn btn-primary">Add Loan</button> <!-- Submit button for the form -->
+    </div>
+</EditForm>
+<!-- Error and success message display -->
+@if (!string.IsNullOrEmpty(validationMessage))
+{
+    <div class="alert alert-danger">@validationMessage</div>
+}
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@code {
+    // Fields to hold form and search data
+    private Loan newLoan = new Loan();
+    private List<Loan> searchResults = new List<Loan>();
+    private List<Book> searchBooks = new List<Book>();
+    private List<Member> searchMembers = new List<Member>();
+    private string searchTerm;
+    private string validationMessage;
+    private string successMessage;
+    private int currentPage = 1;
+    private int pageSize = 8; 
+
+    // Lifecycle method to load data on initialization
+    protected override async Task OnInitializedAsync()
+    {
+        await FetchLoans();
+        await FetchBooks();
+        await FetchMembers();
+    }
+
+    // Method to fetch all loans and handle exceptions
+    private async Task FetchLoans()
+    {
+        try
+        {
+            var loans = await LoanService.GetLoansAsync();
+            searchResults = loans.ToList();
+        }
+        catch (Exception ex)
+        {
+            validationMessage = $"Error fetching books: {ex.Message}";
+            Console.WriteLine(validationMessage);
+        }
+    }
+
+    // Method to fetch all books and handle exceptions
+    private async Task FetchBooks()
+    {
+        try
+        {
+            var books = await BookService.GetBooksAsync();
+            searchBooks = books.ToList();
+        }
+        catch (Exception ex)
+        {
+            validationMessage = $"Error fetching books: {ex.Message}";
+        }
+    }
+
+    // Method to fetch all loans and handle exceptions
+    private async Task FetchMembers()
+    {
+        try
+        {
+            var members = await MemberService.GetMembersAsync();
+            searchMembers = members.ToList();
+        }
+        catch (Exception ex)
+        {
+            validationMessage = $"Error fetching books: {ex.Message}";
+            Console.WriteLine(validationMessage);
+        }
+    }
+
+    // Pagination helper methods
+    private bool IsFirstPage() => currentPage == 1;
+    private bool IsLastPage() => (currentPage * pageSize) >= searchResults.Count;
+    private void PrevPage()
+    {
+        if (!IsFirstPage())
+            currentPage--;
+    }
+    private void NextPage()
+    {
+        if (!IsLastPage())
+            currentPage++;
+    }
+
+    // Method to add a new loan and handle exceptions
+    private async Task AddLoan()
+    {
+        try
+        {
+            await LoanService.AddLoan(newLoan);
+            newLoan = new Loan(); // Reset the form
+            await FetchLoans();
+            successMessage = "Loan added successfully.";
+        }
+        catch (Exception ex)
+        {
+            validationMessage = "Failed to add loan: " + ex.Message;
+        }
+        StateHasChanged(); // Trigger UI update
+        await Task.Delay(3000); // Delay for message display
+        ClearMessages(); // Clear messages after display
+    }
+
+    // Method to return a loan
+    private async Task ReturnLoan(Loan returnLoan)
+    {
+        await LoanService.ReturnLoan(returnLoan);
+    }
+
+    // Method to search loans based on the search term
+    private async Task SearchLoans()
+    {
+        try
+        {
+            var loans = await LoanService.GetLoansAsync();
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                searchResults = loans.ToList();
+            }
+            else
+            {
+                searchResults = loans.Where(b => b.BookTitle.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                                                    || b.MemberName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                                                    || b.MemberEmail.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                                                    || b.BookISBN.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+            validationMessage = "";
+        }
+        catch (Exception ex)
+        {
+            validationMessage = "Search failed: " + ex.Message;
+        }
+    }
+
+    // Method to clear display messages
+    private void ClearMessages()
+    {
+        validationMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+}
