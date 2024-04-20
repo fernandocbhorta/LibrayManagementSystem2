@@ -60,6 +60,9 @@ public class BookService : IBookService
     // Updates the details of an existing book in the database
     public async Task UpdateBook(Book updatedBook)
     {
+        var book = await db.FindAsync<Book>(updatedBook.Id); // First finds the book by ID
+        int bookIncrease = updatedBook.TotalCopies - book.TotalCopies; // if increase book's totalCopies, the availableCopies need to be increased.
+        if (bookIncrease > 0) updatedBook.AvailableCopies += bookIncrease;
         await db.UpdateAsync(updatedBook); // Performs an update on the book record
     }
 }
