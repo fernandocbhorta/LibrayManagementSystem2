@@ -102,6 +102,10 @@ else
         <label for="totalCopies">TotalCopies:</label>
         <InputNumber id="totalCopies" class="form-control" @bind-Value="editingBook.TotalCopies" />
     </div>
+    <div class="form-group">
+        <label for="availableCopies">Available Copies:</label>
+        <InputNumber id="availableCopies" class="form-control" @bind-Value="editingBook.AvailableCopies" />
+    </div>
     <div class="form-group mt-3">
         <button type="submit" class="btn btn-primary mr-2">@ActionText</button>
         <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
